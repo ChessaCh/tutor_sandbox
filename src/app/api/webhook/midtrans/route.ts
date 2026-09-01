@@ -70,35 +70,51 @@ export async function POST(req: NextRequest) {
   // 3. Tentukan status baru
   let newStatus = existing.status;
 
-  if (successLikeStatuses.includes(transactionStatus)) {
-    if (!fraudStatus || fraudStatus === 'accept') {
-      newStatus = 'settlement';
-    }
-  } else if (
-    failureLikeStatuses.includes(transactionStatus)
-  ) {
-    newStatus =
-      transactionStatus as typeof newStatus;
-  } else if (transactionStatus === 'pending') {
-    newStatus = 'pending';
+if (successLikeStatuses.includes(transactionStatus)) {
+  if (!fraudStatus || fraudStatus === 'accept') {
+    newStatus = 'settlement';
   }
+} else if (
+  failureLikeStatuses.includes(transactionStatus)
+) {
+  newStatus = transactionStatus as typeof newStatus;
+} else if (transactionStatus === 'pending') {
+  newStatus = 'pending';
+}
 
-  // 4. Update database
-  db.update(orderId, {
-    status: newStatus,
-    rawNotification: body,
-  });
-
+// CEK DUPLIKAT
+if (existing.status === newStatus) {
   console.log(
-    `Order ${orderId} diperbarui menjadi ${newStatus}`
+    `Order ${orderId} sudah berstatus ${newStatus}, notifikasi diabaikan sebagai duplikat.`
   );
 
   return NextResponse.json(
     {
       received: true,
+      duplicate: true,
     },
     {
       status: 200,
     }
   );
+}
+
+// BARU UPDATE DATABASE
+db.update(orderId, {
+  status: newStatus,
+  rawNotification: body,
+});
+
+console.log(
+  `Order ${orderId} diperbarui menjadi ${newStatus}`
+);
+
+return NextResponse.json(
+  {
+    received: true,
+  },
+  {
+    status: 200,
+  }
+);
 }

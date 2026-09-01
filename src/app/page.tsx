@@ -8,14 +8,20 @@ export default function CheckoutPage() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // ==========================================
+  // NORMAL CHECKOUT
+  // ==========================================
   async function handleCheckout() {
     setLoading(true);
 
     try {
+      const idempotencyKey = crypto.randomUUID();
+
       const res = await fetch('/api/transactions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
         },
         body: JSON.stringify({
           grossAmount: amount,
@@ -38,6 +44,80 @@ export default function CheckoutPage() {
     }
   }
 
+  // ==========================================
+  // REQUEST TIMEOUT TEST
+  // ==========================================
+  async function handleTimeoutTest() {
+    const idempotencyKey = crypto.randomUUID();
+
+    console.log('Idempotency Key:', idempotencyKey);
+
+    const controller = new AbortController();
+
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, 100);
+
+    try {
+      await fetch('/api/transactions', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify({
+          grossAmount: 50000,
+        }),
+      });
+
+      console.log('Request pertama selesai sebelum timeout');
+    } catch (error) {
+      console.log(
+        'Request diputus karena timeout. Akan retry dengan key yang sama:',
+        idempotencyKey
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    // Tunggu supaya request pertama sempat diproses server
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    console.log('Melakukan retry...');
+
+    try {
+      const retryResponse = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify({
+          grossAmount: 50000,
+        }),
+      });
+
+      const retryData = await retryResponse.json();
+
+      console.log('Hasil retry:', retryData);
+
+      if (retryResponse.ok) {
+        alert(
+          `Retry berhasil!\nOrder ID: ${retryData.orderId}`
+        );
+      } else {
+        alert(`Retry gagal: ${retryData.error}`);
+      }
+    } catch (error) {
+      console.error('Retry gagal:', error);
+      alert('Retry gagal');
+    }
+  }
+
+  // ==========================================
+  // UI
+  // ==========================================
   return (
     <main
       style={{
@@ -70,6 +150,12 @@ export default function CheckoutPage() {
       >
         {loading ? 'Memproses...' : 'Buat Transaksi QRIS'}
       </button>
+
+      <div style={{ marginTop: 16 }}>
+        <button onClick={handleTimeoutTest}>
+          Simulasi Request Timeout
+        </button>
+      </div>
 
       {orderId && (
         <p>
