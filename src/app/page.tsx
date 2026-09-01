@@ -1,69 +1,93 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
 
-export default function Home() {
+import { useState } from 'react';
+
+export default function CheckoutPage() {
+  const [amount, setAmount] = useState(50000);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleCheckout() {
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          grossAmount: amount,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setQrCodeUrl(data.qrCodeUrl);
+        setOrderId(data.orderId);
+      } else {
+        alert(data.error);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Terjadi kesalahan saat membuat transaksi');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main
+      style={{
+        maxWidth: 480,
+        margin: '48px auto',
+        fontFamily: 'sans-serif',
+      }}
+    >
+      <h1>Praktikum Sandbox QRIS</h1>
+
+      <label>
+        Nominal (IDR)
+
+        <input
+          type="number"
+          value={amount}
+          onChange={(e) => setAmount(Number(e.target.value))}
+          style={{
+            display: 'block',
+            margin: '8px 0',
+            padding: 8,
+            width: '100%',
+          }}
         />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </label>
+
+      <button
+        onClick={handleCheckout}
+        disabled={loading}
+      >
+        {loading ? 'Memproses...' : 'Buat Transaksi QRIS'}
+      </button>
+
+      {orderId && (
+        <p>
+          Order ID: {orderId}
+        </p>
+      )}
+
+      {qrCodeUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={qrCodeUrl}
+          alt="QRIS code"
+          style={{
+            marginTop: 16,
+            width: 240,
+          }}
+        />
+      )}
+    </main>
   );
 }
